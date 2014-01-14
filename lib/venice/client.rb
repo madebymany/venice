@@ -1,6 +1,7 @@
 require 'json'
 require 'net/https'
 require 'uri'
+require 'multi_json'
 
 module Venice
   ITUNES_PRODUCTION_RECEIPT_VERIFICATION_ENDPOINT = "https://buy.itunes.apple.com/verifyReceipt"
@@ -30,21 +31,11 @@ module Venice
 
     def verify!(data, options = {})
       json = json_response_from_verifying_data(data)
-      status, receipt_attributes = json['status'].to_i, json['receipt']
+      status, receipt_attributes = json[:status].to_i, json[:receipt]
 
       case status
       when 0, 21006
-        receipt = Receipt.new(receipt_attributes)
-
-        if latest_receipt_attributes = json['latest_receipt_info']
-          receipt.latest = Receipt.new(latest_receipt_attributes)
-        end
-
-        if latest_expired_receipt_attributes = json['latest_expired_receipt_info']
-          receipt.latest_expired = Receipt.new(latest_expired_receipt_attributes)
-        end
-
-        return receipt
+        return json
       else
         raise Receipt::VerificationError.new(status)
       end
@@ -71,7 +62,7 @@ module Venice
 
       response = http.request(request)
 
-      JSON.parse(response.body)
+      MultiJson.load(response.body, symbolize_keys: true)
     end
   end
 end
